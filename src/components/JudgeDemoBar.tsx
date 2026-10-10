@@ -1,6 +1,6 @@
 import React from 'react';
-import { Moon, Sun, BrainCircuit, Sparkles, Clock, AlertTriangle, ShieldCheck, Lock } from 'lucide-react';
-import { ThrottleStatus } from '../types';
+import { Moon, Sun, BrainCircuit, Sparkles, Clock, AlertTriangle, ShieldCheck, Lock, LogOut } from 'lucide-react';
+import { ThrottleStatus, AuthUser } from '../types';
 
 interface JudgeDemoBarProps {
   isSimulatedBedtime: boolean;
@@ -10,6 +10,8 @@ interface JudgeDemoBarProps {
   throttleStatus: ThrottleStatus;
   isDaytimePassActive: boolean;
   passTimeFormatted: string;
+  authUser?: AuthUser | null;
+  onSignOut?: () => void;
 }
 
 export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
@@ -19,7 +21,9 @@ export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
   onAddIdleTime,
   throttleStatus,
   isDaytimePassActive,
-  passTimeFormatted
+  passTimeFormatted,
+  authUser,
+  onSignOut
 }) => {
   return (
     <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-zinc-800 shadow-lg px-3 py-2 text-xs">
@@ -35,9 +39,33 @@ export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
           </span>
         </div>
 
-        {/* Dynamic status pill */}
-        <div>
-          {throttleStatus.isThrottled ? (
+        {/* User Badge & Dynamic status pill */}
+        <div className="flex items-center gap-1.5">
+          {authUser && (
+            <div className="flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-full bg-zinc-900 border border-zinc-750 font-mono text-[10px]">
+              <img
+                src={authUser.avatar}
+                alt={authUser.name}
+                className="w-3.5 h-3.5 rounded-full object-cover border border-zinc-700"
+              />
+              <span className="text-zinc-300 max-w-[65px] truncate">
+                {authUser.name.split(' ')[0]}
+              </span>
+              {onSignOut && (
+                <button
+                  onClick={onSignOut}
+                  title="Sign Out"
+                  className="p-0.5 text-zinc-500 hover:text-rose-400 transition-colors ml-0.5"
+                >
+                  <LogOut className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Dynamic status pill */}
+          <div>
+            {throttleStatus.isThrottled ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-600/60 text-amber-300 font-mono text-[10px] animate-pulse">
               <Moon className="w-3 h-3 text-amber-400" />
               {isSimulatedBedtime ? 'SIM BEDTIME THROTTLE' : 'BEDTIME THROTTLE'}
@@ -65,6 +93,7 @@ export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
           )}
         </div>
       </div>
+    </div>
 
       {/* Action Buttons */}
       <div className="grid grid-cols-3 gap-1.5 font-mono">

@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Brain
 } from 'lucide-react';
-import { LeaderboardEntry } from '../../types';
+import { LeaderboardEntry, AuthUser } from '../../types';
 import { UserStats, calculateIdleTokens } from '../../services/idleMining';
 
 interface LeaderboardViewProps {
@@ -19,13 +19,17 @@ interface LeaderboardViewProps {
   rankedEntries: LeaderboardEntry[];
   currentUserRank: number;
   onAddIdleMinutes: (minutes: number) => void;
+  onResetStats?: () => void;
+  authUser?: AuthUser | null;
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   userStats,
   rankedEntries,
   currentUserRank,
-  onAddIdleMinutes
+  onAddIdleMinutes,
+  onResetStats,
+  authUser
 }) => {
   return (
     <div className="w-full min-h-[calc(100vh-105px)] overflow-y-auto p-4 pb-20 bg-slate-950 text-zinc-100 flex flex-col items-center">
@@ -45,7 +49,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                 {userStats.username}
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
               </h3>
-              <p className="text-[10px] text-zinc-400">Global Resilience Standings</p>
+              <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[150px]">
+                {authUser?.email ? `Linked: ${authUser.email}` : 'Global Standings'}
+              </p>
             </div>
           </div>
 
@@ -96,9 +102,20 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           </p>
         </div>
 
-        {/* Quick Simulation Button for Judges */}
+        {/* Quick Simulation & Reset Button for Judges */}
         <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-850">
-          <span className="text-[10px] font-mono text-zinc-400">Judge Shortcut:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-zinc-400">Actions:</span>
+            {onResetStats && (
+              <button
+                onClick={onResetStats}
+                className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/50 text-rose-300 text-[10px] font-mono transition-colors"
+                title="Reset leaderboard stats to 0 for this account"
+              >
+                Reset Stats
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => onAddIdleMinutes(15)}

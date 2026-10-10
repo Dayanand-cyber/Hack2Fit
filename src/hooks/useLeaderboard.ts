@@ -4,6 +4,7 @@ import {
   UserStats,
   loadUserStats,
   saveUserStats,
+  resetUserStatsForEmail,
   calculateIdleTokens,
   INITIAL_PEERS,
   recordLastActiveTimestamp,
@@ -17,15 +18,22 @@ export interface MiningClaimNotice {
   bonus: number;
 }
 
-export function useLeaderboard() {
-  const [userStats, setUserStats] = useState<UserStats>(loadUserStats);
+export function useLeaderboard(authUser?: { name: string; avatar: string; email: string } | null) {
+  const [userStats, setUserStats] = useState<UserStats>(() =>
+    loadUserStats(authUser?.email, authUser?.name)
+  );
   const [peers, setPeers] = useState<LeaderboardEntry[]>(INITIAL_PEERS);
   const [pendingClaim, setPendingClaim] = useState<MiningClaimNotice | null>(null);
 
-  // Sync userStats to localStorage
+  // When authUser changes (or new email signs in), reset/load stats specific to that email!
   useEffect(() => {
-    saveUserStats(userStats);
-  }, [userStats]);
+    setUserStats(loadUserStats(authUser?.email, authUser?.name));
+  }, [authUser?.email, authUser?.name]);
+
+  // Sync userStats to localStorage under this email's namespace
+  useEffect(() => {
+    saveUserStats(userStats, authUser?.email);
+  }, [userStats, authUser?.email]);
 
   // Logarithmic offline mining via document.visibilityState and focus/blur
   useEffect(() => {
@@ -88,7 +96,7 @@ export function useLeaderboard() {
         totalIdleMinutes: prev.totalIdleMinutes + minutes,
         lastClaimTime: Date.now()
       };
-      saveUserStats(updated);
+      saveUserStats(updated, authUser?.email);
       return updated;
     });
 
@@ -99,12 +107,19 @@ export function useLeaderboard() {
     });
 
     soundFx.playSuccess();
-  }, [userStats.streakDays]);
+  }, [userStats.streakDays, authUser?.email]);
 
   // Dismiss claim toast
   const dismissClaim = useCallback(() => {
     setPendingClaim(null);
   }, []);
+
+  // Reset leaderboard stats to 0 for this email
+  const resetLeaderboardStats = useCallback(() => {
+    const reset = resetUserStatsForEmail(authUser?.email, authUser?.name);
+    setUserStats(reset);
+    soundFx.playSuccess();
+  }, [authUser?.email, authUser?.name]);
 
   // Update streak or username
   const updateUserProfile = useCallback((name: string, streak: number) => {
@@ -117,11 +132,17 @@ export function useLeaderboard() {
 
   // Combine currentUser and peers into ranked leaderboard
   const rankedEntries = useMemo(() => {
+    const displayName = authUser?.name || userStats.username;
+    const displayAvatar =
+      authUser?.avatar ||
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80';
+    const cleanHandle = `@${displayName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
     const currentUserEntry: LeaderboardEntry = {
       id: 'current-user',
-      username: userStats.username,
-      handle: '@dayanand_resilient',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      username: displayName,
+      handle: cleanHandle,
+      avatar: displayAvatar,
       tokens: userStats.tokens,
       streakDays: userStats.streakDays,
       isCurrentUser: true,
@@ -136,7 +157,7 @@ export function useLeaderboard() {
       ...entry,
       rank: idx + 1
     }));
-  }, [userStats, peers]);
+  }, [userStats, peers, authUser]);
 
   const currentUserRank = useMemo(() => {
     const found = rankedEntries.find((e) => e.isCurrentUser);
@@ -150,6 +171,7 @@ export function useLeaderboard() {
     pendingClaim,
     dismissClaim,
     addSimulatedIdleMinutes,
-    updateUserProfile
+    updateUserProfile,
+    resetLeaderboardStats
   };
 }

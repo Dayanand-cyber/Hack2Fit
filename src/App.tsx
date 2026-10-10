@@ -6,13 +6,42 @@ import { StroopTestModal } from './components/Feed/StroopTestModal';
 import { StudyTollBoothModal } from './components/StudyGate/StudyTollBoothModal';
 import { LeaderboardView } from './components/Leaderboard/LeaderboardView';
 import { CircadianSettings } from './components/Settings/CircadianSettings';
+import { GoogleLoginPage } from './components/Auth/GoogleLoginPage';
 import { useCircadian } from './hooks/useCircadian';
 import { useDaytimePass } from './hooks/useDaytimePass';
 import { useLeaderboard } from './hooks/useLeaderboard';
+import { useVirtualClock } from './hooks/useVirtualClock';
+import { TimeControllerHUD } from './components/Clock/TimeControllerHUD';
+import { AuthUser } from './types';
+import { loadAuthUser, saveAuthUser } from './services/auth';
 import { Sparkles, X, Coins, Flame } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('feed');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => loadAuthUser());
+
+  const handleSignInSuccess = (user: AuthUser) => {
+    setAuthUser(user);
+    saveAuthUser(user);
+  };
+
+  const handleSignOut = () => {
+    setAuthUser(null);
+    saveAuthUser(null);
+  };
+
+  const handleContinueAsGuest = () => {
+    const guestUser: AuthUser = {
+      id: `guest-${Date.now()}`,
+      name: 'Guest Judge',
+      email: 'judge.guest@hack2pitch.dev',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      provider: 'guest',
+      signedInAt: Date.now()
+    };
+    setAuthUser(guestUser);
+    saveAuthUser(guestUser);
+  };
 
   // Daytime Pass hook (10 min active learning pass)
   const {
@@ -24,7 +53,10 @@ export const App: React.FC = () => {
     revokePass
   } = useDaytimePass();
 
-  // Circadian Throttle engine hook
+  // Virtual Clock & Reminders hook (5m full-screen time splash + 30m study check)
+  const virtualClock = useVirtualClock(activeTab === 'feed');
+
+  // Circadian Throttle engine hook (synchronized with virtual clock!)
   const {
     sleepWindow,
     setSleepWindow,
@@ -35,7 +67,7 @@ export const App: React.FC = () => {
     setIsStroopModalOpen,
     grantEmergencyUnlock,
     imposeFailedCooldown
-  } = useCircadian(isDaytimePassActive);
+  } = useCircadian(isDaytimePassActive, virtualClock.totalMinutesOfDay);
 
   // Leaderboard & logarithmic idle mining hook
   const {
@@ -44,8 +76,9 @@ export const App: React.FC = () => {
     currentUserRank,
     pendingClaim,
     dismissClaim,
-    addSimulatedIdleMinutes
-  } = useLeaderboard();
+    addSimulatedIdleMinutes,
+    resetLeaderboardStats
+  } = useLeaderboard(authUser);
 
   const handleToggleBedtime = () => {
     if (!isSimulatedBedtime) {
@@ -53,6 +86,16 @@ export const App: React.FC = () => {
     }
     toggleSimulateBedtime();
   };
+
+  // If user is not signed in, show the dedicated Google Login Page
+  if (!authUser) {
+    return (
+      <GoogleLoginPage
+        onSignInSuccess={handleSignInSuccess}
+        onContinueAsGuest={handleContinueAsGuest}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex justify-center selection:bg-violet-500/30 selection:text-violet-200">
@@ -67,7 +110,12 @@ export const App: React.FC = () => {
           throttleStatus={throttleStatus}
           isDaytimePassActive={isDaytimePassActive}
           passTimeFormatted={passTimeFormatted}
+          authUser={authUser}
+          onSignOut={handleSignOut}
         />
+
+        {/* Interactive Virtual Clock Controller HUD & Time Scrubber */}
+        <TimeControllerHUD clock={virtualClock} />
 
         {/* Offline Mining Claim Notification Toast */}
         {pendingClaim && (
@@ -104,6 +152,14 @@ export const App: React.FC = () => {
               onOpenStudyGate={() => setActiveTab('study')}
               isDaytimePassActive={isDaytimePassActive}
               passTimeFormatted={passTimeFormatted}
+              isDaytime={virtualClock.isDaytime}
+              isNight={virtualClock.isNight}
+              formattedTime={virtualClock.formattedTime}
+              isFiveMinSplashActive={virtualClock.isFiveMinSplashActive}
+              fiveMinSplashCountdown={virtualClock.fiveMinSplashCountdown}
+              onDismissFiveMinSplash={virtualClock.dismissFiveMinSplash}
+              isThirtyMinRecallActive={virtualClock.isThirtyMinRecallActive}
+              onDismissThirtyMinRecall={virtualClock.dismissThirtyMinRecall}
             />
           )}
 
@@ -124,6 +180,8 @@ export const App: React.FC = () => {
               rankedEntries={rankedEntries}
               currentUserRank={currentUserRank}
               onAddIdleMinutes={(mins) => addSimulatedIdleMinutes(mins)}
+              onResetStats={resetLeaderboardStats}
+              authUser={authUser}
             />
           )}
 
@@ -131,7 +189,9 @@ export const App: React.FC = () => {
             <CircadianSettings
               sleepWindow={sleepWindow}
               onUpdateSleepWindow={setSleepWindow}
-              onResetStats={() => {}}
+              onResetStats={resetLeaderboardStats}
+              authUser={authUser}
+              onSignOut={handleSignOut}
             />
           )}
         </main>

@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { FeedPost, ThrottleStatus } from '../../types';
 import { ThrottleOverlay } from './ThrottleOverlay';
+import { FullScreenTimeSplash } from './FullScreenTimeSplash';
+import { StudyRecallIntervention } from './StudyRecallIntervention';
 import { soundFx } from '../../services/audio';
 
 interface SocialFeedProps {
@@ -24,6 +26,16 @@ interface SocialFeedProps {
   onOpenStudyGate: () => void;
   isDaytimePassActive: boolean;
   passTimeFormatted: string;
+
+  // Virtual Clock & Daytime Reminders
+  isDaytime?: boolean;
+  isNight?: boolean;
+  formattedTime?: string;
+  isFiveMinSplashActive?: boolean;
+  fiveMinSplashCountdown?: number;
+  onDismissFiveMinSplash?: () => void;
+  isThirtyMinRecallActive?: boolean;
+  onDismissThirtyMinRecall?: () => void;
 }
 
 const MOCK_POSTS: FeedPost[] = [
@@ -94,7 +106,15 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
   onOpenStroopTest,
   onOpenStudyGate,
   isDaytimePassActive,
-  passTimeFormatted
+  passTimeFormatted,
+  isDaytime,
+  isNight,
+  formattedTime,
+  isFiveMinSplashActive,
+  fiveMinSplashCountdown,
+  onDismissFiveMinSplash,
+  isThirtyMinRecallActive,
+  onDismissThirtyMinRecall
 }) => {
   const [activePostIndex, setActivePostIndex] = useState<number>(0);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
@@ -109,6 +129,75 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
   const [isManuallyPaused, setIsManuallyPaused] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  // Randomized Bedtime Network Lag Engine
+  // During night window or bedtime throttle:
+  // Randomizes playback behavior per reel:
+  // - 30% chance: Smooth playback! (Full watch without stutter)
+  // - 30% chance: Early stutter (buffers 2-3s in)
+  // - 25% chance: Mid stutter (buffers 5-7s in)
+  // - 15% chance: Immediate stutter
+  const [randomBuffering, setRandomBuffering] = useState<boolean>(false);
+  const [randomLagText, setRandomLagText] = useState<string>('Variable Nocturnal Stutter');
+  const lagTimerRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    lagTimerRef.current.forEach((t) => clearTimeout(t));
+    lagTimerRef.current = [];
+    setRandomBuffering(false);
+
+    if (!throttleStatus.isThrottled && !isNight) {
+      return;
+    }
+
+    // Determine random profile for this reel
+    const rand = Math.random();
+
+    if (rand < 0.30) {
+      // Profile: Full watch! Video plays smoothly without any stutter!
+      setRandomBuffering(false);
+    } else if (rand < 0.60) {
+      // Profile: Early stutter (plays 2.5s, then buffers for 3s)
+      const t1 = setTimeout(() => {
+        setRandomBuffering(true);
+        setRandomLagText('2G Packet Loss: 82% (14 kbps)');
+        soundFx.playThrottleAlert();
+        const t2 = setTimeout(() => {
+          setRandomBuffering(false);
+        }, 3000);
+        lagTimerRef.current.push(t2);
+      }, 2500);
+      lagTimerRef.current.push(t1);
+    } else if (rand < 0.85) {
+      // Profile: Mid-watch stutter (plays 5s, then buffers for 3.5s)
+      const t1 = setTimeout(() => {
+        setRandomBuffering(true);
+        setRandomLagText('Nocturnal Latency Spike: 1,840ms');
+        soundFx.playThrottleAlert();
+        const t2 = setTimeout(() => {
+          setRandomBuffering(false);
+        }, 3500);
+        lagTimerRef.current.push(t2);
+      }, 5000);
+      lagTimerRef.current.push(t1);
+    } else {
+      // Profile: Immediate stutter
+      setRandomBuffering(true);
+      setRandomLagText('Network Buffer Stall (Variable 2G)');
+      soundFx.playThrottleAlert();
+      const t = setTimeout(() => {
+        setRandomBuffering(false);
+      }, 3000);
+      lagTimerRef.current.push(t);
+    }
+
+    return () => {
+      lagTimerRef.current.forEach((t) => clearTimeout(t));
+      lagTimerRef.current = [];
+    };
+  }, [activePostIndex, throttleStatus.isThrottled, isNight]);
+
+  const isEffectiveBuffering = throttleStatus.isBuffering || randomBuffering;
 
   // Toggle play/pause when user taps the video
   const handleTogglePlayPause = (idx: number) => {
@@ -142,7 +231,7 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
       vid.muted = isMuted;
 
       if (idx === activePostIndex) {
-        if (throttleStatus.isBuffering || isManuallyPaused) {
+        if (isEffectiveBuffering || isManuallyPaused) {
           vid.pause();
         } else {
           // If throttled, simulate slow network by slowing video playback to 0.5x
@@ -160,7 +249,7 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
         } catch {}
       }
     });
-  }, [activePostIndex, throttleStatus.isBuffering, throttleStatus.isThrottled, isMuted, isManuallyPaused]);
+  }, [activePostIndex, isEffectiveBuffering, throttleStatus.isThrottled, isMuted, isManuallyPaused]);
 
   // Sluggish scroll simulation: when throttled, add touch/wheel drag resistance
   const handleScroll = () => {
@@ -270,13 +359,14 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
                 )}
               </div>
 
-              {/* Bedtime Throttle Forced Buffer Spinner */}
+              {/* Bedtime Throttle Forced Buffer Spinner with Unpredictable Lag */}
               {isCurrent && (
                 <ThrottleOverlay
-                  isBuffering={throttleStatus.isBuffering}
+                  isBuffering={isEffectiveBuffering}
                   onOpenStroopTest={onOpenStroopTest}
                   reason={throttleStatus.reason}
                   cooldownSeconds={throttleStatus.failedCooldownRemainingSeconds}
+                  networkDetail={randomLagText}
                 />
               )}
 
@@ -369,6 +459,22 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
           );
         })}
       </div>
+
+      {/* 5-Minute Full-Screen Time Splash Reminder (Daytime 6 AM - 6 PM) */}
+      {isFiveMinSplashActive && onDismissFiveMinSplash && (
+        <FullScreenTimeSplash
+          timeFormatted={formattedTime || '12:00 PM'}
+          countdown={fiveMinSplashCountdown || 3}
+          onDismiss={onDismissFiveMinSplash}
+        />
+      )}
+
+      {/* 30-Minute Daytime Active Retrieval Challenge */}
+      {isThirtyMinRecallActive && onDismissThirtyMinRecall && (
+        <StudyRecallIntervention
+          onComplete={onDismissThirtyMinRecall}
+        />
+      )}
     </div>
   );
 };

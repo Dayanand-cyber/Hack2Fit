@@ -58,3 +58,12 @@ export interface DaytimePass {
   expiresAt: number | null; // timestamp in ms
   durationMinutes: number;
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  provider: 'google' | 'guest';
+  signedInAt: number;
+}

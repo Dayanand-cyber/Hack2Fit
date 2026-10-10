@@ -8,21 +8,27 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  Sliders
+  Sliders,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
-import { SleepWindow } from '../../types';
+import { SleepWindow, AuthUser } from '../../types';
 import { DEFAULT_SLEEP_WINDOW } from '../../hooks/useCircadian';
 
 interface CircadianSettingsProps {
   sleepWindow: SleepWindow;
   onUpdateSleepWindow: (window: SleepWindow) => void;
   onResetStats: () => void;
+  authUser?: AuthUser | null;
+  onSignOut?: () => void;
 }
 
 export const CircadianSettings: React.FC<CircadianSettingsProps> = ({
   sleepWindow,
   onUpdateSleepWindow,
-  onResetStats
+  onResetStats,
+  authUser,
+  onSignOut
 }) => {
   const [startHour, setStartHour] = useState<number>(sleepWindow.startHour);
   const [startMinute, setStartMinute] = useState<number>(sleepWindow.startMinute);
@@ -69,6 +75,36 @@ export const CircadianSettings: React.FC<CircadianSettingsProps> = ({
             <p className="text-[11px] text-zinc-400">Parameters & Cognitive Safeguards</p>
           </div>
         </div>
+
+        {/* Connected Account Section */}
+        {authUser && (
+          <div className="p-3 rounded-xl bg-slate-950 border border-zinc-800 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              <img
+                src={authUser.avatar}
+                alt={authUser.name}
+                className="w-9 h-9 rounded-full object-cover border border-violet-500/50 flex-shrink-0"
+              />
+              <div className="truncate">
+                <div className="flex items-center gap-1">
+                  <h4 className="text-xs font-bold text-white truncate">{authUser.name}</h4>
+                  <UserCheck className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                </div>
+                <p className="text-[10px] text-zinc-400 truncate font-mono">{authUser.email}</p>
+              </div>
+            </div>
+
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="px-2 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/50 text-rose-300 font-mono text-[10px] flex items-center gap-1 transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Sign Out</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Sleep Window Configuration */}
         <div>
@@ -199,6 +235,14 @@ export const CircadianSettings: React.FC<CircadianSettingsProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Standard 10:30 PM - 07:00 AM</span>
+          </button>
+
+          <button
+            onClick={onResetStats}
+            className="w-full py-2 rounded-xl bg-rose-950/30 hover:bg-rose-900/40 border border-rose-800/40 text-rose-300 font-mono text-[11px] transition-colors flex items-center justify-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Leaderboard Balance (0 $CBK)</span>
           </button>
         </div>
       </div>

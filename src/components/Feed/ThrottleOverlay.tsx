@@ -6,13 +6,15 @@ interface ThrottleOverlayProps {
   onOpenStroopTest: () => void;
   reason: 'bedtime_window' | 'demo_simulation' | 'failed_test_cooldown' | null;
   cooldownSeconds: number;
+  networkDetail?: string;
 }
 
 export const ThrottleOverlay: React.FC<ThrottleOverlayProps> = ({
   isBuffering,
   onOpenStroopTest,
   reason,
-  cooldownSeconds
+  cooldownSeconds,
+  networkDetail
 }) => {
   if (!isBuffering && reason !== 'failed_test_cooldown') return null;
 
@@ -33,13 +35,13 @@ export const ThrottleOverlay: React.FC<ThrottleOverlayProps> = ({
       </div>
 
       <h3 className="text-lg font-bold text-zinc-100 tracking-tight font-sans">
-        Forced Buffering Stutter (3s)
+        {networkDetail || 'Unpredictable Network Stutter'}
       </h3>
 
       <p className="text-xs text-zinc-400 max-w-xs mt-2 leading-relaxed">
         {reason === 'failed_test_cooldown'
           ? `Alertness challenge failed. Strict lockout active for ${Math.floor(cooldownSeconds / 60)}m ${cooldownSeconds % 60}s.`
-          : 'Dopamine delivery intentionally stalled to break nocturnal reward loops and restore sleep architecture.'}
+          : 'Randomized nocturnal packet loss to break late-night dopamine loops and protect circadian rhythm.'}
       </p>
 
       {reason !== 'failed_test_cooldown' && (

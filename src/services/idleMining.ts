@@ -12,10 +12,10 @@ export interface UserStats {
 }
 
 export const INITIAL_USER_STATS: UserStats = {
-  username: 'Dayanand (You)',
-  tokens: 184,
-  streakDays: 4,
-  totalIdleMinutes: 340,
+  username: 'Dayanand',
+  tokens: 0,
+  streakDays: 0,
+  totalIdleMinutes: 0,
   lastClaimTime: Date.now()
 };
 
@@ -84,21 +84,54 @@ export function calculateIdleTokens(idleMinutes: number, sleepAdherenceBonus: nu
   return baseTokens + sleepAdherenceBonus;
 }
 
-export function loadUserStats(): UserStats {
+export function getUserStatsKey(email?: string): string {
+  if (!email) return 'comeback_user_stats_guest';
+  return `comeback_user_stats_${email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+}
+
+export function loadUserStats(email?: string, defaultName?: string): UserStats {
+  const key = getUserStatsKey(email);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_USER_STATS);
+    const raw = localStorage.getItem(key);
     if (raw) {
       return JSON.parse(raw);
     }
   } catch (err) {
     console.warn('Failed to load user stats from localStorage:', err);
   }
-  return INITIAL_USER_STATS;
+
+  // When an email signs in for the first time:
+  // Reset leaderboard with a fresh starting balance linked directly to this email!
+  const name = defaultName || (email ? email.split('@')[0] : 'Guest User');
+  const cleanName = name.charAt(0).toUpperCase() + name.slice(1);
+
+  return {
+    username: cleanName,
+    tokens: 0, // Clean reset starting balance linked directly to this email!
+    streakDays: 0,
+    totalIdleMinutes: 0,
+    lastClaimTime: Date.now()
+  };
 }
 
-export function saveUserStats(stats: UserStats) {
+export function resetUserStatsForEmail(email?: string, defaultName?: string): UserStats {
+  const name = defaultName || (email ? email.split('@')[0] : 'Guest User');
+  const cleanName = name.charAt(0).toUpperCase() + name.slice(1);
+  const resetStats: UserStats = {
+    username: cleanName,
+    tokens: 0,
+    streakDays: 0,
+    totalIdleMinutes: 0,
+    lastClaimTime: Date.now()
+  };
+  saveUserStats(resetStats, email);
+  return resetStats;
+}
+
+export function saveUserStats(stats: UserStats, email?: string) {
+  const key = getUserStatsKey(email);
   try {
-    localStorage.setItem(STORAGE_KEY_USER_STATS, JSON.stringify(stats));
+    localStorage.setItem(key, JSON.stringify(stats));
   } catch (err) {
     console.warn('Failed to save user stats to localStorage:', err);
   }

@@ -8,13 +8,13 @@ const STORAGE_KEY_FAILED_LOCK = 'comeback_failed_lock_expires';
 
 export const DEFAULT_SLEEP_WINDOW: SleepWindow = {
   startHour: 22,
-  startMinute: 30, // 10:30 PM
-  endHour: 7,
-  endMinute: 0, // 07:00 AM
+  startMinute: 0, // 10:00 PM
+  endHour: 6,
+  endMinute: 0, // 06:00 AM
   isEnabled: true
 };
 
-export function useCircadian(isDaytimePassActive: boolean) {
+export function useCircadian(isDaytimePassActive: boolean, virtualMinutesOfDay?: number) {
   // Sleep window configuration
   const [sleepWindow, setSleepWindow] = useState<SleepWindow>(() => {
     try {
@@ -42,22 +42,27 @@ export function useCircadian(isDaytimePassActive: boolean) {
     localStorage.setItem(STORAGE_KEY_SLEEP_WINDOW, JSON.stringify(sleepWindow));
   }, [sleepWindow]);
 
-  // Check if current time falls within sleep window
+  // Check if current time falls within sleep window (10 PM - 6 AM)
   const isCurrentlyInBedtimeWindow = useCallback(() => {
     if (!sleepWindow.isEnabled) return false;
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    let currentMinutes: number;
+    if (typeof virtualMinutesOfDay === 'number') {
+      currentMinutes = virtualMinutesOfDay;
+    } else {
+      const now = new Date();
+      currentMinutes = now.getHours() * 60 + now.getMinutes();
+    }
     const startMinutes = sleepWindow.startHour * 60 + sleepWindow.startMinute;
     const endMinutes = sleepWindow.endHour * 60 + sleepWindow.endMinute;
 
     if (startMinutes > endMinutes) {
-      // Overnight window (e.g. 22:30 -> 07:00)
+      // Overnight window (e.g. 22:00 -> 06:00)
       return currentMinutes >= startMinutes || currentMinutes < endMinutes;
     } else {
       // Window on same day (e.g. 13:00 -> 15:00)
       return currentMinutes >= startMinutes && currentMinutes < endMinutes;
     }
-  }, [sleepWindow]);
+  }, [sleepWindow, virtualMinutesOfDay]);
 
   // Check countdowns from localStorage on mount & interval
   useEffect(() => {
